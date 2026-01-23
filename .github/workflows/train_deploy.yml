@@ -8,9 +8,6 @@ on:
 jobs:
   train:
     runs-on: ubuntu-latest
-    outputs:
-      r2: ${{ steps.read.outputs.r2 }}
-      mse: ${{ steps.read.outputs.mse }}
 
     steps:
       - name: Checkout
@@ -30,15 +27,11 @@ jobs:
         run: |
           python scripts/train.py
 
-      - name: Read metrics.json
-        id: read
+      - name: Read metrics.json (log only)
         run: |
           python - << 'PY'
           import json
           m = json.load(open("metrics.json"))
-          with open("${GITHUB_OUTPUT}", "a") as out:
-              out.write(f"r2={m['r2']}\n")
-              out.write(f"mse={m['mse']}\n")
           print("metrics:", m)
           PY
 
@@ -69,9 +62,12 @@ jobs:
         id: gate
         run: |
           python - << 'PY'
-          import os
-          cur_r2  = float(os.environ["CUR_R2"])
-          cur_mse = float(os.environ["CUR_MSE"])
+          import json, os
+
+          m = json.load(open("metrics.json"))
+          cur_r2  = float(m["r2"])
+          cur_mse = float(m["mse"])
+
           best_r2  = float(os.environ["BEST_R2"])
           best_mse = float(os.environ["BEST_MSE"])
 
@@ -79,14 +75,14 @@ jobs:
 
           with open(os.environ["GITHUB_OUTPUT"], "a") as out:
               out.write(f"improved={'true' if improved else 'false'}\n")
+              out.write(f"cur_r2={cur_r2}\n")
+              out.write(f"cur_mse={cur_mse}\n")
 
           print("Current:", cur_r2, cur_mse)
           print("Best:   ", best_r2, best_mse)
           print("Improved?", improved)
           PY
         env:
-          CUR_R2: ${{ needs.train.outputs.r2 }}
-          CUR_MSE: ${{ needs.train.outputs.mse }}
           BEST_R2: ${{ vars.BEST_R2 }}
           BEST_MSE: ${{ vars.BEST_MSE }}
 
@@ -115,6 +111,7 @@ jobs:
         run: |
           python - << 'PY'
           import os, requests
+
           owner, repo = os.environ["GITHUB_REPOSITORY"].split("/")
           token = os.environ["GH_PAT"]
 
@@ -135,5 +132,5 @@ jobs:
           PY
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
-          CUR_R2: ${{ needs.train.outputs.r2 }}
-          CUR_MSE: ${{ needs.train.outputs.mse }}
+          CUR_R2: ${{ steps.gate.outputs.cur_r2 }}
+          CUR_MSE: ${{ steps.gate.outputs.cur_mse }}
