@@ -1,0 +1,16 @@
+# model / metrics artifacts (do not commit)
+model.pkl
+model.joblib
+results.json
+metrics.json
+
+# python cache
+__pycache__/
+*.pyc
+
+# VS Code
+.vscode/
+
+# envs
+venv/
+.venv/

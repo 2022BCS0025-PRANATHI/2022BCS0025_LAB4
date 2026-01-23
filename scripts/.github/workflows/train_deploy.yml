@@ -1,0 +1,139 @@
+name: Train and Deploy (CI/CD)
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    outputs:
+      r2: ${{ steps.read.outputs.r2 }}
+      mse: ${{ steps.read.outputs.mse }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Train model
+        run: |
+          python scripts/train.py
+
+      - name: Read metrics.json
+        id: read
+        run: |
+          python - << 'PY'
+          import json
+          m = json.load(open("metrics.json"))
+          with open("${GITHUB_OUTPUT}", "a") as out:
+              out.write(f"r2={m['r2']}\n")
+              out.write(f"mse={m['mse']}\n")
+          print("metrics:", m)
+          PY
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: trained-model
+          path: |
+            model.pkl
+            metrics.json
+            results.json
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: train
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: trained-model
+          path: .
+
+      - name: Compare metrics with baseline
+        id: gate
+        run: |
+          python - << 'PY'
+          import os
+          cur_r2  = float(os.environ["CUR_R2"])
+          cur_mse = float(os.environ["CUR_MSE"])
+          best_r2  = float(os.environ["BEST_R2"])
+          best_mse = float(os.environ["BEST_MSE"])
+
+          improved = (cur_r2 > best_r2) and (cur_mse < best_mse)
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(f"improved={'true' if improved else 'false'}\n")
+
+          print("Current:", cur_r2, cur_mse)
+          print("Best:   ", best_r2, best_mse)
+          print("Improved?", improved)
+          PY
+        env:
+          CUR_R2: ${{ needs.train.outputs.r2 }}
+          CUR_MSE: ${{ needs.train.outputs.mse }}
+          BEST_R2: ${{ vars.BEST_R2 }}
+          BEST_MSE: ${{ vars.BEST_MSE }}
+
+      - name: Stop if not improved
+        if: steps.gate.outputs.improved != 'true'
+        run: |
+          echo "2022BCS0025----Metric did not improve"
+          exit 0
+
+      - name: Login Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/wine_predict_2022bcs0025:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/wine_predict_2022bcs0025:${{ github.sha }}
+
+      - name: Update BEST_R2 and BEST_MSE (GitHub Variables)
+        run: |
+          python - << 'PY'
+          import os, requests
+          owner, repo = os.environ["GITHUB_REPOSITORY"].split("/")
+          token = os.environ["GH_PAT"]
+
+          def patch_var(name, value):
+              url = f"https://api.github.com/repos/{owner}/{repo}/actions/variables/{name}"
+              headers = {
+                  "Authorization": f"Bearer {token}",
+                  "Accept": "application/vnd.github+json",
+                  "X-GitHub-Api-Version": "2022-11-28"
+              }
+              r = requests.patch(url, headers=headers, json={"name": name, "value": str(value)})
+              if r.status_code not in (200, 201, 204):
+                  raise SystemExit(f"Failed updating {name}: {r.status_code} {r.text}")
+              print("Updated", name, value)
+
+          patch_var("BEST_R2", os.environ["CUR_R2"])
+          patch_var("BEST_MSE", os.environ["CUR_MSE"])
+          PY
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+          CUR_R2: ${{ needs.train.outputs.r2 }}
+          CUR_MSE: ${{ needs.train.outputs.mse }}
