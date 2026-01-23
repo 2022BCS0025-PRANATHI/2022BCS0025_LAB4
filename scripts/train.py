@@ -7,7 +7,7 @@ from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.ensemble import RandomForestRegressor
 
 DATA_PATH = "winequality-red.csv"  
-
+# 
 def main():
     df = pd.read_csv(DATA_PATH, sep=";")
     X = df.drop("quality", axis=1)

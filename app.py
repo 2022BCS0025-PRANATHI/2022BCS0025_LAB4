@@ -45,7 +45,7 @@ def predict(features: WineFeatures):
 
     pred = model.predict(x)[0]
 
-    # wine quality is usually an integer label; if regression, round
+
     wine_quality = int(round(float(pred)))
 
     return {
