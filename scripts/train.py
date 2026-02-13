@@ -27,23 +27,28 @@ def main():
     mse = mean_squared_error(y_test, preds)
     r2 = r2_score(y_test, preds)
 
-    # Save trained model
     joblib.dump(model, "model.pkl")
 
-    # REQUIRED by Lab 6
-    os.makedirs("app/artifacts", exist_ok=True)
-
-    # Jenkins expects "accuracy"
     metrics = {
-        "accuracy": float(r2),
-        "mse": float(mse)
+        "r2": float(r2),
+        "mse": float(mse),
+        "accuracy": float(r2)  # for Jenkins
     }
 
-    # REQUIRED location
+    # 1️⃣ Save for GitHub Actions (Lab 4)
+    with open("metrics.json", "w") as f:
+        json.dump(metrics, f, indent=2)
+
+    with open("results.json", "w") as f:
+        json.dump(metrics, f, indent=2)
+
+    # 2️⃣ Save for Jenkins (Lab 6)
+    os.makedirs("app/artifacts", exist_ok=True)
+
     with open("app/artifacts/metrics.json", "w") as f:
         json.dump(metrics, f, indent=2)
 
-    print("Training complete")
+    print("Saved model and metrics")
     print(metrics)
 
 if __name__ == "__main__":
