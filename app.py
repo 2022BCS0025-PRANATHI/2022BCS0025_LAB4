@@ -23,7 +23,7 @@ class WineFeatures(BaseModel):
     sulphates: float
     alcohol: float
 
-@app.get("/")
+@app.get("/health")
 def home():
     return {"status": "ok", "service": "wine-quality-inference"}
 
