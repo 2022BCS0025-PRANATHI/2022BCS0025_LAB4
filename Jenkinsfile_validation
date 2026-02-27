@@ -18,7 +18,11 @@ pipeline {
         stage('Run Container') {
             steps {
                 sh """
-                docker run -d -p $PORT:8000 --name $CONTAINER $IMAGE
+                echo "Removing old container if exists..."
+                docker rm -f $CONTAINER || true
+
+                echo "Starting container with host network..."
+                docker run -d --network host --name $CONTAINER $IMAGE
                 """
             }
         }
@@ -89,8 +93,7 @@ pipeline {
         stage('Stop Container') {
             steps {
                 sh """
-                docker stop $CONTAINER || true
-                docker rm $CONTAINER || true
+                docker rm -f $CONTAINER || true
                 """
             }
         }
