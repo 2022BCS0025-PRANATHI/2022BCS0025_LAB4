@@ -18,33 +18,33 @@ pipeline {
             steps {
                 sh '''
                 docker rm -f $CONTAINER_NAME || true
-                docker network create ml_network || true
-                docker run -d --network ml_network \
+                docker run -d -p 8000:8000 \
+                --add-host=host.docker.internal:host-gateway \
                 --name $CONTAINER_NAME $IMAGE_NAME
                 '''
             }
         }
         stage('Wait for Service Readiness') {
-            steps {
-                script {
-                    timeout(time: 60, unit: 'SECONDS') {
-                        waitUntil {
-                            def response = sh(
-                                script: "curl -s -o /dev/null -w '%{http_code}' http://wine_test_container:8000/ || true",
-                                returnStdout: true
-                            ).trim()
-                            return (response == "200")
+                steps {
+                    script {
+                        timeout(time: 90, unit: 'SECONDS') {
+                            waitUntil {
+                                def response = sh(
+                                    script: "curl -s -o /dev/null -w '%{http_code}' http://host.docker.internal:8000/ || true",
+                                    returnStdout: true
+                                ).trim()
+                                return (response == "200")
+                            }
                         }
                     }
                 }
             }
-        }
 
         stage('Valid Inference Test') {
             steps {
                 script {
                     def response = sh(
-                        script: """curl -s -X POST http://wine_test_container:8000/predict \
+                        script: """curl -s -X POST http://host.docker.internal:8000/predict \
                         -H 'Content-Type: application/json' \
                         -d '{
                           "fixed_acidity":7.4,
@@ -75,7 +75,7 @@ pipeline {
             steps {
                 script {
                     def response = sh(
-                        script: """curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8000/predict \
+                        script: """curl -s -o /dev/null -w '%{http_code}' -X POST http://host.docker.internal:8000/predict \
                         -H 'Content-Type: application/json' \
                         -d '{"fixed_acidity":7.4}'""",
                         returnStdout: true
