@@ -14,11 +14,12 @@ pipeline {
             }
         }
 
-       stage('Run Container') {
+      stage('Run Container') {
             steps {
                 sh '''
                 docker rm -f $CONTAINER_NAME || true
-                docker run -d --network host \
+                docker network create ml_network || true
+                docker run -d --network ml_network \
                 --name $CONTAINER_NAME $IMAGE_NAME
                 '''
             }
