@@ -5,7 +5,7 @@ pipeline {
         IMAGE_NAME = "2022bcs0025pranathi/wine:latest"
         CONTAINER_NAME = "wine_test_container"
         PORT = "8000"
-        HOST = "host.docker.internal"
+        HOST = "localhost"
     }
 
     stages {
@@ -19,6 +19,7 @@ pipeline {
         stage('Run Container') {
             steps {
                 sh '''
+                docker rm -f $CONTAINER_NAME || true
                 docker run -d -p $PORT:8000 --name $CONTAINER_NAME $IMAGE_NAME
                 '''
             }
@@ -87,8 +88,7 @@ pipeline {
     post {
         always {
             sh '''
-            docker stop $CONTAINER_NAME || true
-            docker rm $CONTAINER_NAME || true
+            docker rm -f $CONTAINER_NAME || true
             '''
         }
     }
