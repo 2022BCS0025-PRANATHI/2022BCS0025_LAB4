@@ -14,7 +14,7 @@ pipeline {
             }
         }
 
-      stage('Run Container') {
+        stage('Run Container') {
             steps {
                 sh '''
                 docker rm -f $CONTAINER_NAME || true
@@ -24,21 +24,22 @@ pipeline {
                 '''
             }
         }
+
         stage('Wait for Service Readiness') {
-                steps {
-                    script {
-                        timeout(time: 90, unit: 'SECONDS') {
-                            waitUntil {
-                                def response = sh(
-                                    script: "curl -s -o /dev/null -w '%{http_code}' http://host.docker.internal:8000/ || true",
-                                    returnStdout: true
-                                ).trim()
-                                return (response == "200")
-                            }
+            steps {
+                script {
+                    timeout(time: 90, unit: 'SECONDS') {
+                        waitUntil {
+                            def response = sh(
+                                script: "curl -s -o /dev/null -w '%{http_code}' http://host.docker.internal:8000/ || true",
+                                returnStdout: true
+                            ).trim()
+                            return (response == "200")
                         }
                     }
                 }
             }
+        }
 
         stage('Valid Inference Test') {
             steps {
@@ -65,7 +66,7 @@ pipeline {
                     echo "Valid Response: ${response}"
 
                     if (!(response ==~ /.*\d+.*/)) {
-                        error("❌ Prediction is not numeric!")
+                        error("Prediction is not numeric")
                     }
                 }
             }
@@ -84,7 +85,7 @@ pipeline {
                     echo "Invalid Status Code: ${response}"
 
                     if (response != "422") {
-                        error("❌ Invalid input did not return 422!")
+                        error("Invalid input did not return expected error")
                     }
                 }
             }
@@ -101,12 +102,6 @@ pipeline {
     }
 
     post {
-        success {
-            echo "✅ Pipeline Passed - Model Validation Successful"
-        }
-        failure {
-            echo "❌ Pipeline Failed - Validation Error"
-        }
         always {
             sh 'docker rm -f $CONTAINER_NAME || true'
         }
