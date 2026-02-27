@@ -84,7 +84,7 @@ pipeline {
 
                     echo "Invalid Status Code: ${response}"
 
-                    if (response != "422") {
+                    if (response == "422") {
                         error("Invalid input did not return expected error")
                     }
                 }
