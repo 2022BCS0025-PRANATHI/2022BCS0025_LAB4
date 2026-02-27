@@ -30,7 +30,7 @@ pipeline {
                     timeout(time: 60, unit: 'SECONDS') {
                         waitUntil {
                             def status = sh(
-                                script: "curl -s -o /dev/null -w '%{http_code}' http://$HOST:$PORT/health || true",
+                                script: "curl -s -o /dev/null -w '%{http_code}' http://$HOST:$PORT/ || true",
                                 returnStdout: true
                             ).trim()
                             echo "Health check status: ${status}"
